@@ -1,0 +1,21 @@
+======================================
+    ENVIRONMENTAL LOG SUMMARY         
+======================================
+Analysis Time:      2026-06-08 16:28:06
+Total Data Points:  24198
+Run Start Time:     2026-06-03 15:18:09
+Run End Time:       2026-06-08 16:00:00
+Total Duration:     120.70 hours
+--------------------------------------
+TEMPERATURE STATISTICS
+Mean Temp:          18.46 °C
+Std Deviation:      0.24 °C
+Max Temp:           20.00 °C
+Min Temp:           17.10 °C
+--------------------------------------
+HUMIDITY STATISTICS
+Mean Humidity:      45.58 %rh
+Std Deviation:      2.53 %rh
+Max Humidity:       60.00 %rh
+Min Humidity:       43.00 %rh
+======================================

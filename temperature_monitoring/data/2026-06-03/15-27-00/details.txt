@@ -1,0 +1,4 @@
+Details:
+This was just a test of the temperature monitor USB. At the start I had it next to me by
+the lab PC, and then I put it inside the barriers on the optical table to monitor the
+temperature there.

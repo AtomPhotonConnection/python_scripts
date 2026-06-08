@@ -1,0 +1,13 @@
+======================================
+    LASER POWER SUMMARY STATISTICS    
+======================================
+Analysis Time:      2026-06-03 17:03:52
+Total Data Points:  95
+Total Duration:     0.03 hours
+--------------------------------------
+Mean Power:         3.628810e-02 W
+Std Deviation:      3.687927e-03 W
+Std Dev %:          10.16%
+Max Power:          4.063921e-02 W
+Min Power:          2.956961e-02 W
+======================================

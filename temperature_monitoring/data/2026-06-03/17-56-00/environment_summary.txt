@@ -1,0 +1,19 @@
+======================================
+    ENVIRONMENTAL LOG SUMMARY         
+======================================
+Analysis Time:      2026-06-03 17:57:35
+Total Data Points:  602
+Total Duration:     149.22 minutes
+--------------------------------------
+TEMPERATURE STATISTICS
+Mean Temp:          18.19 °C
+Std Deviation:      0.53 °C
+Max Temp:           19.20 °C
+Min Temp:           17.10 °C
+--------------------------------------
+HUMIDITY STATISTICS
+Mean Humidity:      57.37 %rh
+Std Deviation:      1.12 %rh
+Max Humidity:       60.00 %rh
+Min Humidity:       56.00 %rh
+======================================

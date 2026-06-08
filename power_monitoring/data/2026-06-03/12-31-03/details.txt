@@ -1,0 +1,5 @@
+Details:
+A long term measurement of the power just before the AOM that is actually used to modulate
+the laser power onto the experimental table.
+This data shows that the power fluctuation in this arm is much larger than for the other
+arm.
