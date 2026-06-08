@@ -1,9 +1,11 @@
 import argparse
 from pathlib import Path
 import pandas as pd
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 from io import StringIO
-from PIL import Image, ImageDraw, ImageFont
 
 # --- Configuration ---
 DEFAULT_DATE = datetime.now().strftime("%Y-%m-%d")
@@ -137,149 +139,65 @@ def analyze_environment_data(run_date: str, run_time: str):
 
     # --- 2. Generate and Save the Plot ---
     print("Generating temperature and humidity stability plot...")
+    
+    # Set up 2 stacked subplots sharing the same X axis (Time)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(11, 8), sharex=True)
     plot_x_max = total_duration_hours if total_duration_hours > 0 else 1
 
-    width, height = 1600, 1100
-    image = Image.new("RGB", (width, height), "white")
-    draw = ImageDraw.Draw(image)
+    # Top Plot: Temperature
+    ax1.plot(elapsed_hours, df["Celsius(°C)"], label="Measured Temp", color="#d62728", linewidth=1.5)
+    ax1.plot([0, plot_x_max], [mean_temp, mean_temp], color="black", linestyle="--", alpha=0.7, label=f"Mean ({mean_temp:.2f} °C)")
+    if std_temp > 0:
+        ax1.plot([0, plot_x_max], [mean_temp + std_temp, mean_temp + std_temp], color="gray", linestyle=":", alpha=0.6, label="+1 Std Dev")
+        ax1.plot([0, plot_x_max], [mean_temp - std_temp, mean_temp - std_temp], color="gray", linestyle=":", alpha=0.6, label="-1 Std Dev")
+    ax1.set_title(f"Environmental Stability Over Time ({run_date} {run_time})", fontsize=14, fontweight="bold", pad=12)
+    ax1.set_ylabel("Temperature (°C)", fontsize=11)
+    ax1.grid(True, linestyle=":", alpha=0.6)
+    ax1.legend(loc="upper right", framealpha=0.9)
 
-    def load_font(size: int, bold: bool = False):
-        candidates = [
-            r"C:\Windows\Fonts\arialbd.ttf" if bold else r"C:\Windows\Fonts\arial.ttf",
-            r"C:\Windows\Fonts\segoeuib.ttf" if bold else r"C:\Windows\Fonts\segoeui.ttf",
-        ]
-        for candidate in candidates:
-            try:
-                return ImageFont.truetype(candidate, size=size)
-            except OSError:
-                continue
-        return ImageFont.load_default()
+    # Bottom Plot: Humidity
+    ax2.plot(elapsed_hours, df["Humidity(%rh)"], label="Measured Humidity", color="#1f77b4", linewidth=1.5)
+    ax2.plot([0, plot_x_max], [mean_hum, mean_hum], color="black", linestyle="--", alpha=0.7, label=f"Mean ({mean_hum:.2f} %rh)")
+    if std_hum > 0:
+        ax2.plot([0, plot_x_max], [mean_hum + std_hum, mean_hum + std_hum], color="gray", linestyle=":", alpha=0.6, label="+1 Std Dev")
+        ax2.plot([0, plot_x_max], [mean_hum - std_hum, mean_hum - std_hum], color="gray", linestyle=":", alpha=0.6, label="-1 Std Dev")
+    ax2.set_xlabel("Elapsed Time (hours)", fontsize=11)
+    ax2.set_ylabel("Humidity (%rh)", fontsize=11)
+    ax2.grid(True, linestyle=":", alpha=0.6)
+    ax2.legend(loc="upper right", framealpha=0.9)
 
-    title_font = load_font(24, bold=True)
-    axis_font = load_font(18)
-    label_font = load_font(16)
-    small_font = load_font(13)
-    legend_font = load_font(15)
+    ax2.set_xlim(0, plot_x_max)
 
-    def text_size(text: str, font):
-        bbox = draw.multiline_textbbox((0, 0), text, font=font, spacing=4)
-        return bbox[2] - bbox[0], bbox[3] - bbox[1]
+    top_axis = ax2.twiny()
+    top_axis.set_xlim(ax2.get_xlim())
+    top_axis.set_xlabel("Actual Date / Time")
 
-    def format_tick_label(hours_value: float):
-        return (inferred_run_start + timedelta(hours=hours_value)).strftime("%Y-%m-%d\n%H:%M")
+    if total_duration_hours <= 6:
+        tick_step = 1
+    elif total_duration_hours <= 24:
+        tick_step = 4
+    elif total_duration_hours <= 72:
+        tick_step = 12
+    else:
+        tick_step = 24
 
-    def choose_ticks(duration_hours: float):
-        if duration_hours <= 6:
-            step = 1
-        elif duration_hours <= 24:
-            step = 4
-        elif duration_hours <= 72:
-            step = 12
-        else:
-            step = 24
+    top_ticks = [0]
+    next_tick = tick_step
+    while next_tick < total_duration_hours:
+        top_ticks.append(next_tick)
+        next_tick += tick_step
+    if total_duration_hours > 0 and top_ticks[-1] != total_duration_hours:
+        top_ticks.append(total_duration_hours)
 
-        ticks = [0.0]
-        current = float(step)
-        while current < duration_hours:
-            ticks.append(current)
-            current += step
-        return ticks
+    top_axis.set_xticks(top_ticks)
+    top_axis.set_xticklabels(
+        [(inferred_run_start + timedelta(hours=tick)).strftime("%Y-%m-%d\n%H:%M") for tick in top_ticks]
+    )
 
-    def draw_rotated_label(position, text, font, fill):
-        label_w, label_h = text_size(text, font)
-        label_image = Image.new("RGBA", (label_w + 8, label_h + 8), (255, 255, 255, 0))
-        label_draw = ImageDraw.Draw(label_image)
-        label_draw.text((4, 4), text, font=font, fill=fill)
-        rotated = label_image.rotate(90, expand=True)
-        image.paste(rotated, position, rotated)
-
-    def draw_panel(x0, y0, x1, y1, y_values, line_color, mean_value, std_value, ylabel, legend_label):
-        panel_width = x1 - x0
-        panel_height = y1 - y0
-        y_min = min(min(y_values), mean_value - (std_value * 1.5 if std_value > 0 else 0.5))
-        y_max = max(max(y_values), mean_value + (std_value * 1.5 if std_value > 0 else 0.5))
-        y_padding = max((y_max - y_min) * 0.08, 0.25)
-        y_min -= y_padding
-        y_max += y_padding
-
-        def x_to_px(value):
-            return x0 + (value / plot_x_max) * panel_width
-
-        def y_to_px(value):
-            return y1 - ((value - y_min) / (y_max - y_min)) * panel_height
-
-        draw.rectangle([x0, y0, x1, y1], outline="#222222", width=2)
-
-        y_ticks = 5
-        for index in range(y_ticks + 1):
-            tick_value = y_min + (y_max - y_min) * index / y_ticks
-            tick_y = y_to_px(tick_value)
-            draw.line([(x0, tick_y), (x1, tick_y)], fill="#d9d9d9", width=1)
-            tick_label = f"{tick_value:.1f}"
-            label_w, label_h = text_size(tick_label, small_font)
-            draw.text((x0 - label_w - 12, tick_y - label_h / 2), tick_label, font=small_font, fill="#222222")
-
-        x_ticks = choose_ticks(plot_x_max)
-        for tick_value in x_ticks:
-            tick_x = x_to_px(tick_value)
-            draw.line([(tick_x, y0), (tick_x, y1)], fill="#ededed", width=1)
-
-        points = list(zip((x_to_px(value) for value in elapsed_hours), (y_to_px(value) for value in y_values)))
-        if len(points) > 1:
-            draw.line(points, fill=line_color, width=3)
-
-        mean_y = y_to_px(mean_value)
-        draw.line([(x0, mean_y), (x1, mean_y)], fill="#111111", width=2)
-        if std_value > 0:
-            draw.line([(x0, y_to_px(mean_value + std_value)), (x1, y_to_px(mean_value + std_value))], fill="#777777", width=2)
-            draw.line([(x0, y_to_px(mean_value - std_value)), (x1, y_to_px(mean_value - std_value))], fill="#777777", width=2)
-
-        title_w, title_h = text_size(legend_label, axis_font)
-        draw.text((x0, y0 - title_h - 10), legend_label, font=axis_font, fill="#111111")
-        draw_rotated_label((20, int(y0 + panel_height / 2 - 70)), ylabel, label_font, "#111111")
-
-        legend_items = [(line_color, "Measured"), ("#111111", f"Mean ({mean_value:.2f})")]
-        if std_value > 0:
-            legend_items.extend([("#777777", "+/- 1 Std Dev")])
-        legend_x = x1 - 270
-        legend_y = y0 + 20
-        for color, label in legend_items:
-            draw.line([(legend_x, legend_y + 10), (legend_x + 30, legend_y + 10)], fill=color, width=3)
-            draw.text((legend_x + 40, legend_y), label, font=legend_font, fill="#111111")
-            legend_y += 28
-
-        return x_to_px, y_to_px, x_ticks
-
-    title_text = f"Environmental Stability Over Time ({run_date} {run_time})"
-    title_w, title_h = text_size(title_text, title_font)
-    draw.text(((width - title_w) / 2, 24), title_text, font=title_font, fill="#111111")
-
-    top_x0, top_y0, top_x1, top_y1 = 120, 90, 1540, 450
-    bottom_x0, bottom_y0, bottom_x1, bottom_y1 = 120, 600, 1540, 960
-
-    draw_panel(top_x0, top_y0, top_x1, top_y1, df["Celsius(°C)"].tolist(), "#d62728", mean_temp, std_temp, "Temperature (°C)", "Temperature")
-    x_to_px, _, bottom_ticks = draw_panel(bottom_x0, bottom_y0, bottom_x1, bottom_y1, df["Humidity(%rh)"].tolist(), "#1f77b4", mean_hum, std_hum, "Humidity (%rh)", "Humidity")
-
-    bottom_axis_y = bottom_y1 + 24
-    draw.line([(bottom_x0, bottom_y1), (bottom_x1, bottom_y1)], fill="#222222", width=2)
-    bottom_label = "Elapsed Time (hours)"
-    bottom_label_w, bottom_label_h = text_size(bottom_label, axis_font)
-    draw.text(((bottom_x0 + bottom_x1 - bottom_label_w) / 2, bottom_axis_y + 26), bottom_label, font=axis_font, fill="#111111")
-
-    actual_axis_label = "Actual Date / Time"
-    actual_axis_label_w, _ = text_size(actual_axis_label, axis_font)
-    draw.text(((bottom_x0 + bottom_x1 - actual_axis_label_w) / 2, bottom_y0 - 56), actual_axis_label, font=axis_font, fill="#111111")
-    for tick_value in bottom_ticks:
-        label = format_tick_label(tick_value)
-        tick_x = x_to_px(tick_value)
-        label_w, label_h = text_size(label, small_font)
-        draw.multiline_text((tick_x - label_w / 2, bottom_y0 - label_h - 16), label, font=small_font, fill="#111111", align="center", spacing=2)
-        draw.line([(tick_x, bottom_y0 - 6), (tick_x, bottom_y0)], fill="#222222", width=2)
-        hour_label = f"{tick_value:.0f}" if tick_value.is_integer() else f"{tick_value:.1f}"
-        hour_label_w, _ = text_size(hour_label, small_font)
-        draw.text((tick_x - hour_label_w / 2, bottom_y1 + 8), hour_label, font=small_font, fill="#111111")
-
-    image.save(plot_path)
+    # Adjust layout and save
+    fig.subplots_adjust(left=0.08, right=0.95, bottom=0.08, top=0.90, hspace=0.20)
+    plt.savefig(plot_path, dpi=300)
+    plt.close()
     
     print(f"Plot successfully saved to: {plot_path}\n")
 
