@@ -114,7 +114,7 @@ BODE_N_POINTS:    int   = 16_384    # frequency resolution for Bode curves
 WELCH_NPERSEG:    int   = 65_536    # Welch PSD segment length
 
 # Default cutoff sweep (200 kHz → 1 GHz; 2 GHz skipped if fs = 2.5 GSa/s)
-DEFAULT_CUTOFFS: List[float] = [100e3, 200e3, 500e3, 1e6]
+DEFAULT_CUTOFFS: List[float] = [100e3]
 
 ALL_FILTER_NAMES: List[str] = [
     "RC (1st)", "Butter 2nd", "Butter 4th", "Butter 8th", "Elliptic 5th"
