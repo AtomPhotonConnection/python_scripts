@@ -113,8 +113,11 @@ MAX_PLOT_SAMPLES: int   = 250_000   # decimate time traces for plotting
 BODE_N_POINTS:    int   = 16_384    # frequency resolution for Bode curves
 WELCH_NPERSEG:    int   = 65_536    # Welch PSD segment length
 
+# Set to False to suppress Fig 1 / Fig 2 (magnitude and phase) plots.
+SHOW_EXTRA_PLOTS: bool = True
+
 # Default cutoff sweep (200 kHz → 1 GHz; 2 GHz skipped if fs = 2.5 GSa/s)
-DEFAULT_CUTOFFS: List[float] = [100e3]
+DEFAULT_CUTOFFS: List[float] = [100e3]#, 200e3, 500e3, 1e6, 2e6]
 
 ALL_FILTER_NAMES: List[str] = [
     "RC (1st)", "Butter 2nd", "Butter 4th", "Butter 8th", "Elliptic 5th"
@@ -122,7 +125,7 @@ ALL_FILTER_NAMES: List[str] = [
 
 # Colour / line styles per filter name
 STYLES = {
-    "Original":     dict(color="#1a1a1a", lw=1.5, ls="-",  alpha=0.80, zorder=10),
+    "Original":     dict(color="#1a1a1a", lw=1.5, ls="-",  alpha=0.80, zorder=1),
     "RC (1st)":     dict(color="#e41a1c", lw=1.2, ls="-",  alpha=1.0,  zorder=6),
     "Butter 2nd":   dict(color="#ff7f00", lw=1.2, ls="-",  alpha=1.0,  zorder=6),
     "Butter 4th":   dict(color="#4daf4a", lw=1.2, ls="-",  alpha=1.0,  zorder=6),
@@ -723,36 +726,47 @@ def run(
     print(f"  Filter mode   : {'causal — sosfilt with DC IC [Ref 5]' if causal else 'zero-phase — sosfiltfilt [Ref 6]'}")
     print(f"  Elliptic spec : rp = {rp_db} dB passband ripple, "
           f"rs = {rs_db} dB stopband attenuation")
-    if separate_filter_plots and len(valid_cutoffs) == 1 and len(filter_names) > 1:
+    if separate_filter_plots:# and len(valid_cutoffs) == 1 and len(filter_names) > 1:
         print("  Plot layout   : separate figure per filter type")
     print()
 
     # ── Generate figures ─────────────────────────────────────────────────────
     split_filter_plots = (
         separate_filter_plots
-        and len(valid_cutoffs) == 1
-        and len(filter_names) > 1
+        # and len(valid_cutoffs) == 1
+        # and len(filter_names) > 1
     )
+    show_extra_plots = SHOW_EXTRA_PLOTS
 
     if split_filter_plots:
         output_path = Path(output) if output else None
         for fname in filter_names:
             slug = filter_slug(fname)
             print(f"  Building plots for {fname} …")
-            bode_fig = figure_bode(valid_cutoffs, [fname], fs, rp_db, rs_db)
-            phase_fig = figure_phase(valid_cutoffs, [fname], fs, rp_db, rs_db)
+            bode_fig = None
+            phase_fig = None
+            psd_fig = None
+            if show_extra_plots:
+                bode_fig = figure_bode(valid_cutoffs, [fname], fs, rp_db, rs_db)
+                phase_fig = figure_phase(valid_cutoffs, [fname], fs, rp_db, rs_db)
+                psd_fig = figure_psd(v, valid_cutoffs, [fname], fs, causal, rp_db, rs_db)
+
             time_fig = figure_time(t, v, valid_cutoffs, [fname], fs, causal, rp_db, rs_db)
-            psd_fig = figure_psd(v, valid_cutoffs, [fname], fs, causal, rp_db, rs_db)
 
             if output_path:
-                for tag, fig in (
-                    (f"bode_{slug}", bode_fig),
-                    (f"phase_{slug}", phase_fig),
+                save_jobs = []
+                if bode_fig is not None:
+                    save_jobs.append((f"bode_{slug}", bode_fig))
+                if phase_fig is not None:
+                    save_jobs.append((f"phase_{slug}", phase_fig))
+                if psd_fig is not None:
+                    save_jobs.append((f"psd_{slug}", psd_fig))
+                save_jobs.extend([
                     (f"time_{slug}", time_fig),
-                    (f"psd_{slug}", psd_fig),
-                ):
-                    out_path = output_path.parent / f"{output_path.stem}_{tag}.png"
-                    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+                ])
+                for tag, fig in save_jobs:
+                    out_path = output_path.parent / f"{output_path.stem}_{tag}.svg"
+                    fig.savefig(out_path, bbox_inches="tight")
                     print(f"  ✓  Saved: {out_path}")
         if output_path:
             print()
@@ -760,28 +774,37 @@ def run(
             plt.show()
         return
     else:
-        print("  Building Bode plots …")
-        fig1 = figure_bode(valid_cutoffs, filter_names, fs, rp_db, rs_db)
+        fig1 = None
+        fig2 = None
+        if show_extra_plots:
+            print("  Building Bode plots …")
+            fig1 = figure_bode(valid_cutoffs, filter_names, fs, rp_db, rs_db)
 
-        print("  Building phase plots …")
-        fig2 = figure_phase(valid_cutoffs, filter_names, fs, rp_db, rs_db)
+            print("  Building phase plots …")
+            fig2 = figure_phase(valid_cutoffs, filter_names, fs, rp_db, rs_db)
+
+            print("  Computing Welch PSD …")
+            fig4 = figure_psd(v, valid_cutoffs, filter_names, fs, causal, rp_db, rs_db)
 
         print("  Applying filters and building time-domain plots …")
         fig3 = figure_time(t, v, valid_cutoffs, filter_names, fs, causal, rp_db, rs_db)
 
-        print("  Computing Welch PSD …")
-        fig4 = figure_psd(v, valid_cutoffs, filter_names, fs, causal, rp_db, rs_db)
+
 
         if output:
             output_path = Path(output)
-            for tag, fig in (
-                ("bode", fig1),
-                ("phase", fig2),
+            save_jobs = []
+            if fig1 is not None:
+                save_jobs.append(("bode", fig1))
+            if fig2 is not None:
+                save_jobs.append(("phase", fig2))
+            save_jobs.extend([
                 ("time", fig3),
                 ("psd", fig4),
-            ):
-                out_path = output_path.parent / f"{output_path.stem}_{tag}.png"
-                fig.savefig(out_path, dpi=150, bbox_inches="tight")
+            ])
+            for tag, fig in save_jobs:
+                out_path = output_path.parent / f"{output_path.stem}_{tag}.svg"
+                fig.savefig(out_path, bbox_inches="tight")
                 print(f"  ✓  Saved: {out_path}")
             print()
         else:
@@ -869,8 +892,8 @@ def main() -> None:
     parser.add_argument(
         "--output", metavar="STEM", default=None,
         help=(
-            "Save figures to STEM_bode.png, STEM_phase.png, "
-            "STEM_time.png, STEM_psd.png instead of displaying interactively."
+            "Save figures to STEM_bode.svg, STEM_phase.svg, "
+            "STEM_time.svg, STEM_psd.svg instead of displaying interactively."
         ),
     )
 
