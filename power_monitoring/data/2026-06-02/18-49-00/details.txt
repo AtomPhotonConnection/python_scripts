@@ -1,4 +1,0 @@
-DETAILS:
-This was measured on the laser preparation table, after the beamcube that splits power
-between the DL Pro wavelength monitoring and the yellow tagged AOM. It shows relatively
-good stability over the 2 hour measurement period.

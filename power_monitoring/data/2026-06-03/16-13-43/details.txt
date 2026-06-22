@@ -1,5 +1,0 @@
-Details:
-Measured straight after the laser mode cleaning fibre. It is very stable here, which makes
-me think that the power is being lost at the beam cube following this due to polarisation
-drift in the fibre. I should be able to correct that by adjusting the waveplate just
-before the fibre though.

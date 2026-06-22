@@ -1,6 +1,0 @@
-DETAILS:
-This was measured on the experimental table, measuring the output of the red tagged fibre,
-which corresponds to the DL Pro laser and channel 4 on the AWG. The power was measured
-following a lens and a pair of mirrors, but this shouldn't affect the power. As the
-variation in the power is large (~60% standard deviation) this is quite problematic. This
-power fluctuation may be caused by instability in the fibres?
